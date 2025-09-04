@@ -41,17 +41,17 @@ exports.registerMovement = async (req, res) => {
     await product.save();
     
     // Registrar movimentação - USANDO OS NOMES CORRETOS DO MODELO
-    const movementData = {
-      productId,
-      type,
-      quantity: numericQuantity,
-      note: note || '',
-      invoiceNumber: invoiceNumber || '',
-      user: user || 'admin', // CORRIGIDO: usando 'user' (nome do campo no modelo)
-      cafeteria: cafeteria || 'Cafeteria Principal',
-      previousStock: numericPreviousStock,
-      newStock: numericNewStock
-    };
+const movementData = {
+  productId,
+  type,
+  quantity: numericQuantity,
+  note: note || '',
+  invoiceNumber: invoiceNumber || '',
+  userId: user || 'admin', // Use userId em vez de user
+  cafeteria: cafeteria || 'Cafeteria Principal',
+  previousStock: numericPreviousStock,
+  newStock: numericNewStock
+};
     
     console.log('📝 Dados para salvar no movimento:', movementData);
     

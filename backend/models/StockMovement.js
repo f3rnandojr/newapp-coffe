@@ -15,31 +15,12 @@ const stockMovementSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  note: {
-    type: String,
-    trim: true
-  },
-  invoiceNumber: {
-    type: String,
-    trim: true
-  },
-  user: {
-    type: String,
-    required: true
-  },
-  cafeteria: {
-    type: String,
-    required: true,
-    default: 'Cafeteria Principal'
-  },
-  previousStock: {
-    type: Number,
-    required: true
-  },
-  newStock: {
-    type: Number,
-    required: true
-  }
+  note: String,
+  invoiceNumber: String,
+  user: String, // Campo user em vez de userId
+  cafeteria: String,
+  previousStock: Number,
+  newStock: Number
 }, {
   timestamps: true
 });

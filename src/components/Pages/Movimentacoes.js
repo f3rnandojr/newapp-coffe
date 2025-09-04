@@ -44,17 +44,9 @@ const Movimentacoes = () => {
         const produtosData = await response.json();
         console.log('📦 Produtos carregados do backend:', produtosData);
         setProdutos(produtosData);
-        
-        // Salvar produtos no localStorage como backup
-        localStorage.setItem('cafeteria_produtos', JSON.stringify(produtosData));
       } catch (error) {
         console.error('Erro ao buscar produtos:', error);
         setError('Erro ao carregar produtos do servidor');
-        // Fallback para dados locais em caso de erro
-        const produtosSalvos = localStorage.getItem('cafeteria_produtos');
-        if (produtosSalvos) {
-          setProdutos(JSON.parse(produtosSalvos));
-        }
       } finally {
         setLoading(false);
       }
@@ -64,55 +56,38 @@ const Movimentacoes = () => {
   }, []);
 
   // Buscar movimentações do backend
-// Buscar movimentações do backend
-useEffect(() => {
-  const fetchMovimentacoes = async () => {
-    try {
-      const response = await fetch('http://localhost:5001/api/movements');
-      if (response.ok) {
-        const movimentacoesData = await response.json();
-        
-        // Mapear os dados do backend para o formato do frontend
-        const movimentacoesFormatadas = movimentacoesData.map(mov => ({
-          id: mov._id,
-          dataHora: mov.createdAt,
-          produtoId: mov.productId,
-          produtoNome: mov.productId?.name || 'Produto não encontrado', // Se o populate não funcionar
-          tipo: mov.type,
-          quantidade: mov.quantity,
-          motivo: mov.note,
-          notaFiscal: mov.invoiceNumber,
-          usuario: mov.user,
-          cafeteria: mov.cafeteria,
-          estoqueAnterior: mov.previousStock,
-          estoqueAtual: mov.newStock
-        }));
-        
-        setMovimentacoes(movimentacoesFormatadas);
-        localStorage.setItem('cafeteria_movimentacoes', JSON.stringify(movimentacoesFormatadas));
-      }
-    } catch (error) {
-      console.error('Erro ao buscar movimentações do backend:', error);
-      // Fallback para localStorage
-      const movimentacoesSalvas = localStorage.getItem('cafeteria_movimentacoes');
-      if (movimentacoesSalvas) {
-        setMovimentacoes(JSON.parse(movimentacoesSalvas));
-      }
-    }
-  };
-
-  fetchMovimentacoes();
-}, []);
-
-  // Salvar movimentações no localStorage quando mudarem
   useEffect(() => {
-    localStorage.setItem('cafeteria_movimentacoes', JSON.stringify(movimentacoes));
-  }, [movimentacoes]);
+    const fetchMovimentacoes = async () => {
+      try {
+        const response = await fetch('http://localhost:5001/api/movements');
+        if (response.ok) {
+          const movimentacoesData = await response.json();
+          
+          // Mapear os dados do backend para o formato do frontend
+          const movimentacoesFormatadas = movimentacoesData.map(mov => ({
+            id: mov._id,
+            dataHora: mov.createdAt,
+            produtoId: mov.productId,
+            produtoNome: mov.productId?.name || 'Produto não encontrado',
+            tipo: mov.type,
+            quantidade: mov.quantity,
+            motivo: mov.note,
+            notaFiscal: mov.invoiceNumber,
+            usuario: mov.user,
+            cafeteria: mov.cafeteria,
+            estoqueAnterior: mov.previousStock,
+            estoqueAtual: mov.newStock
+          }));
+          
+          setMovimentacoes(movimentacoesFormatadas);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar movimentações do backend:', error);
+      }
+    };
 
-  // Salvar produtos quando mudarem
-  useEffect(() => {
-    localStorage.setItem('cafeteria_produtos', JSON.stringify(produtos));
-  }, [produtos]);
+    fetchMovimentacoes();
+  }, []);
 
   // Filtrar movimentações
   const movimentacoesFiltradas = movimentacoes.filter(mov => {
@@ -175,26 +150,6 @@ useEffect(() => {
     return true;
   };
 
-  const atualizarEstoqueLocal = (productId, quantidade, tipo) => {
-    const updatedProdutos = produtos.map(produto => {
-      if (produto._id === productId) {
-        let novoEstoque = produto.estoque;
-        
-        if (['entrada', 'ajuste_entrada'].includes(tipo)) {
-          novoEstoque += parseInt(quantidade);
-        } else if (['ajuste_saida', 'perda', 'venda'].includes(tipo)) {
-          novoEstoque = Math.max(0, novoEstoque - parseInt(quantidade));
-        }
-
-        return { ...produto, estoque: novoEstoque };
-      }
-      return produto;
-    });
-
-    setProdutos(updatedProdutos);
-    return updatedProdutos.find(p => p._id === productId)?.estoque || 0;
-  };
-
   const registrarMovimentacao = async (e) => {
     e.preventDefault();
 
@@ -217,8 +172,10 @@ useEffect(() => {
       user: 'admin',
       cafeteria: novaMovimentacao.cafeteria,
       previousStock: estoqueAnterior,
-      newStock: 0 // O backend vai calcular isso
+      newStock: 0
     };
+
+    console.log('📤 Enviando para o backend:', movimentoParaBackend);
 
     try {
       const response = await fetch('http://localhost:5001/api/movements', {
@@ -229,23 +186,46 @@ useEffect(() => {
         body: JSON.stringify(movimentoParaBackend),
       });
 
+      const responseData = await response.json();
+      console.log('📥 Resposta do backend:', responseData);
+
       if (!response.ok) {
-        throw new Error('Erro ao registrar movimentação no servidor');
+        throw new Error(responseData.message || 'Erro ao registrar movimentação');
       }
 
-      const data = await response.json();
-      console.log('Movimentação registrada no backend:', data);
+      console.log('✅ Movimentação registrada no backend:', responseData);
       
-      // Buscar produtos atualizados do backend
-      const produtosResponse = await fetch('http://localhost:5001/api/products');
-      const produtosAtualizados = await produtosResponse.json();
-      setProdutos(produtosAtualizados);
+      // Recarregar dados do backend
+      const [produtosResponse, movResponse] = await Promise.all([
+        fetch('http://localhost:5001/api/products'),
+        fetch('http://localhost:5001/api/movements')
+      ]);
       
-      // Buscar movimentações atualizadas do backend
-      const movResponse = await fetch('http://localhost:5001/api/movements');
-      const movimentacoesAtualizadas = await movResponse.json();
-      setMovimentacoes(movimentacoesAtualizadas);
+      if (produtosResponse.ok) {
+        const produtosAtualizados = await produtosResponse.json();
+        setProdutos(produtosAtualizados);
+      }
       
+      if (movResponse.ok) {
+        const movimentacoesAtualizadas = await movResponse.json();
+        const movimentacoesFormatadas = movimentacoesAtualizadas.map(mov => ({
+          id: mov._id,
+          dataHora: mov.createdAt,
+          produtoId: mov.productId,
+          produtoNome: mov.productId?.name || 'Produto não encontrado',
+          tipo: mov.type,
+          quantidade: mov.quantity,
+          motivo: mov.note,
+          notaFiscal: mov.invoiceNumber,
+          usuario: mov.user,
+          cafeteria: mov.cafeteria,
+          estoqueAnterior: mov.previousStock,
+          estoqueAtual: mov.newStock
+        }));
+        setMovimentacoes(movimentacoesFormatadas);
+      }
+      
+      // Resetar formulário
       setNovaMovimentacao({
         productId: '',
         tipo: 'entrada',
@@ -256,44 +236,10 @@ useEffect(() => {
       });
 
       alert('Movimentação registrada com sucesso!');
+      
     } catch (error) {
-      console.error('Erro:', error);
-      alert('Erro ao registrar movimentação no servidor. Salvando localmente.');
-      
-      // Fallback local
-      const estoqueAtual = atualizarEstoqueLocal(
-        novaMovimentacao.productId,
-        novaMovimentacao.quantidade,
-        novaMovimentacao.tipo
-      );
-      
-      const novaMov = {
-        id: Date.now(),
-        dataHora: new Date().toISOString(),
-        produtoId: novaMovimentacao.productId,
-        produtoNome: produto.nome,
-        tipo: novaMovimentacao.tipo,
-        quantidade: parseInt(novaMovimentacao.quantidade),
-        motivo: novaMovimentacao.motivo,
-        notaFiscal: novaMovimentacao.notaFiscal,
-        usuario: 'admin',
-        cafeteria: novaMovimentacao.cafeteria,
-        estoqueAnterior: estoqueAnterior,
-        estoqueAtual: estoqueAtual
-      };
-      
-      setMovimentacoes([novaMov, ...movimentacoes]);
-      
-      setNovaMovimentacao({
-        productId: '',
-        tipo: 'entrada',
-        quantidade: '',
-        motivo: '',
-        notaFiscal: '',
-        cafeteria: 'Cafeteria Principal'
-      });
-
-      alert('Movimentação registrada localmente!');
+      console.error('❌ Erro detalhado:', error);
+      alert(`Erro: ${error.message}`);
     }
   };
 
@@ -506,7 +452,6 @@ useEffect(() => {
                 <table className="table table-striped">
                   <thead>
                     <tr>
-                      <th>ID</th>
                       <th>Data/Hora</th>
                       <th>Produto</th>
                       <th>Tipo</th>
@@ -520,7 +465,6 @@ useEffect(() => {
                   <tbody>
                     {movimentacoesFiltradas.map(mov => (
                       <tr key={mov.id}>
-                        <td>{mov.id}</td>
                         <td>{formatarDataHora(mov.dataHora)}</td>
                         <td>
                           <strong>{mov.produtoNome}</strong>
@@ -557,7 +501,7 @@ useEffect(() => {
 
               {movimentacoesFiltradas.length === 0 && (
                 <div className="text-center text-muted py-4">
-                  <p>Nenhuma movimentação encontrada.</p>
+                  <p>Nenhuna movimentação encontrada.</p>
                 </div>
               )}
             </div>
